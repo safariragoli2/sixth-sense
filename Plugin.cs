@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Configuration;
 using Comfort.Common;
 using EFT;
@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace SixSense
 {
-    [BepInPlugin("com.drainlord.SixSense", "SixSense", "0.1")]
+    [BepInPlugin("com.drainlord.SixSense", "SixSense", "0.2")]
     public class Plugin : BaseUnityPlugin
     {
         private static GameWorld gameWorld;
@@ -22,6 +22,8 @@ namespace SixSense
         private ConfigEntry<int> staticSpread;
         private ConfigEntry<float> staticTransparency;
         private ConfigEntry<bool> staticTransparencyFade;
+        private ConfigEntry<bool> staticDistanceSpread;
+        private ConfigEntry<int> staticDistanceSpreadAmount;
         private ConfigEntry<bool> senseDistanceCheck;
         private ConfigEntry<int> senseDistance;
         private ConfigEntry<float> boxSize;
@@ -33,11 +35,14 @@ namespace SixSense
             staticAmount = Config.Bind("Visual", "Amount of Static Cubes", 6, new ConfigDescription("Higher amounts will cause more lag", new AcceptableValueRange<int>(1, 20), Array.Empty<object>()));
             staticSize = Config.Bind("Visual", "Size of Static Cubes", new Vector2(5, 5), "Size of Static Cubes");
             staticSpread = Config.Bind("Visual", "Position Spread of Static Cubes", 55, new ConfigDescription("How spread out the cubes will be from eachother", new AcceptableValueRange<int>(0, 250), Array.Empty<object>()));
-            staticTransparency = Config.Bind("Visual", "Opacity of Static Cubes", 0.5f, new ConfigDescription("How opaque the cubes will be", new AcceptableValueRange<float>(0f, 1f), Array.Empty<object>()));
-            staticTransparencyFade = Config.Bind("Visual", "Increase transparency based on distance", true, "Further enemies will have more transparent static");
+            staticTransparency = Config.Bind("Visual", "Opacity of Static Cubes", 0.9f, new ConfigDescription("How opaque the cubes will be", new AcceptableValueRange<float>(0f, 1f), Array.Empty<object>()));
+            staticTransparencyFade = Config.Bind("Visual", "Increase Transparency Based on Distance", true, "Further enemies will have more transparent static");
+            staticDistanceSpread = Config.Bind("Visual", "Increase Position Spread Based on Distance", true, "Further enemies will have more spread out static");
+            staticDistanceSpreadAmount = Config.Bind("Visual", "Maximum Spread for Distant Enemies", 70, new ConfigDescription("Maximum amount of spread for distant enemies", new AcceptableValueRange<int>(0, 350), Array.Empty<object>()));
 
             senseDistanceCheck = Config.Bind("Functionality", "Check Enemy Distance", true, "Check distance of enemy before showing static");
             senseDistance = Config.Bind("Functionality", "Maximum Enemy Distance", 30, "How far an enemy can be before static disappears");
+
 
             boxSize = Config.Bind("Misc", "Player Box Size", 1.2f, new ConfigDescription("Affects static box size on players", new AcceptableValueRange<float>(0.1f, 2.5f), Array.Empty<object>()));
             modEnabled = Config.Bind("Misc", "Mod Enabled", true, "Turn mod off or on");
@@ -91,8 +96,15 @@ namespace SixSense
 
                             for (int i = 0; i < staticAmount.Value; i++)
                             {
-                                var randomX = UnityEngine.Random.Range(finalX - staticSpread.Value, finalX + boxWidth + staticSpread.Value);
-                                var randomY = UnityEngine.Random.Range(finalY - staticSpread.Value, finalY + boxHeight + staticSpread.Value);
+                                var distanceSpread = 0;
+
+                                if (staticDistanceSpread.Value && senseDistanceCheck.Value)
+                                {
+                                    distanceSpread = (int)(staticDistanceSpreadAmount.Value * (distance / senseDistance.Value));
+                                }
+
+                                var randomX = UnityEngine.Random.Range(finalX - staticSpread.Value - distanceSpread, finalX + boxWidth + staticSpread.Value + distanceSpread);
+                                var randomY = UnityEngine.Random.Range(finalY - staticSpread.Value - distanceSpread, finalY + boxHeight + staticSpread.Value + distanceSpread);
                                 var randomXSize = staticSize.Value.x;
                                 var randomYSize = staticSize.Value.y;
                                 var randomGrey = UnityEngine.Random.Range(0, 10) * 0.1f; 
@@ -100,7 +112,7 @@ namespace SixSense
                                 
                                 if (staticTransparencyFade.Value)
                                 {
-                                    transparency = 1 - (distance / senseDistance.Value);
+                                    transparency = staticTransparency.Value * (1 - (distance / senseDistance.Value));
                                 }
 
                                 GUIDrawRect(new Rect(randomX, randomY, randomXSize, randomYSize), new Color(randomGrey, randomGrey, randomGrey, transparency));
